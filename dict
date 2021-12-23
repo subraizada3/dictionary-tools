@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+
+dict_file_path = 'dict.txt'
+# e.g.     '~/dict.txt'     '/usr/share/dict.txt'     etc.
+
+
+
+# Copyright 2020 Subramaniyam Raizada
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License version 3, as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
+
+# Test cases:
+# A              multiple definitions
+# A 1            space in word
+# a-             symbol, lowercase
+# zoophytic      semicolon first word
+# zooephytic     semicolon middle word
+# zooephytical   semicolon last word
+# whisky         noncontiguous multiple definitions, should be two results
+# whiskey        noncontiguous multiple definitions, should be three results
+# zYThuM         mixed case, last word in dictionary
+#                this will print some extra lines due to the file format
+# asdf           not present in dictionary
+
+
+
+import os
+import sys
+
+dict_file_path = os.path.expanduser(dict_file_path) # expand ~ to home folder
+
+
+if len(sys.argv) == 1 or len(sys.argv) == 2 and sys.argv[1] == '-l':
+	print('Usage:')
+	print('$ dict word')
+	print('$ dict word -l')
+	print('$ dict -l word')
+	print('If a word has multiple definitions, adding the -l option will show one at a time')
+	sys.exit(0)
+
+
+word = ' '.join(sys.argv[1:]).upper()
+show_slowly = False
+
+if sys.argv[1] == '-l':
+	show_slowly = True
+	word = word[3:]
+elif sys.argv[-1] == '-l':
+	show_slowly = True
+	word = word[:-3]
+
+
+
+defn = '' # The found definition(s)
+
+
+
+with open(dict_file_path) as f:
+	lines = [line.strip() for line in f.readlines()]
+
+i = 0
+def_number = 0
+while True:
+	i += 1 # OK to skip line 0; dict file begins with Project Gutenberg headers.
+	if i == len(lines):
+		sys.exit(0)
+
+	# A dictionary entry begins with the word in all caps on a line, and the
+	#   previous line will be empty.
+	# Also, the all caps line can have multiple words separated by '; '.
+	if lines[i-1] == '' and word in lines[i].split('; '):
+		# Print this definition
+		def_number += 1
+		if def_number != 1 and not show_slowly:
+			print('\n\n\n', end='')
+		elif show_slowly:
+			os.system('clear')
+
+		j = i
+		while True:
+			print(lines[j])
+			j += 1
+			# The definition ends when the next word begins
+			#   (at the next line that is all caps).
+			# Also, this case can be triggered if the word pronunciation is all
+			#   caps, so skip if j == i (plus the 1 added above).
+			if j != i + 1 and lines[j].isupper():
+				i = j - 1
+				if show_slowly:
+					print(f'{def_number}')
+					input('Press enter to continue...')
+				break
+			# There can be multiple definitions that are not contiguous in the
+			#   dictionary file, so break to the outer loop and keep searching.
+
+
+
+
+
+# Scanning the entire dictionary file for multiple noncontiguous definitions of
+#   a word makes the program 3-4x slower - that's enough to change it from
+#   showing results seemingly instantaneously to having noticeable lag.
+#     (0.1-0.2 seconds, depending on word position in dictionary file, to a
+#      constant 0.45 seconds, on my computer)
+# The current behaviour is that the outer loop finds all definitions in order,
+#   and a definition matches the user-provided word, that definition is printed
+#   by the inner loop.
+# The previous fast but non-thorough behaviour did not return to the outer
+#   while loop after printing a single definition. Instead, the inner while
+#   loop continued to print multiple definitions until it found a definition
+#   for a word other than the one the user specified. At that point, it printed
+#   the results and the program exited.
+# The disadvantage of the previous fast implementation is that some words like
+#   whisky and whiskey have multiple definitions, with definitions for other
+#   unrelated words between the multiple definitions for whisky/whiskey. The
+#   previous logic would only find the first set of contiguous definitions.
+# Since the previous logic was fast, the found definition(s) could be saved to
+#   a string, with a magic separator between multiple definitions, and then
+#   the string could be split and printed. For the '-l' slow mode, this meant we
+#   could show the definition number as (1/6), (4/6), etc. With this slower but
+#   more through algorithm, we print the definitions as soon as we get them in
+#   order to make the program feel a bit faster. But that means we don't know
+#   how many total definitions there were in the dictionary, so in the slow mode
+#   we can only show that this is the first or fourth definition that was found,
+#   not that it was the first of six or fourth of six. The logic for this new
+#   thorough implementation could be changed to first find all definitions only
+#   when running in slow mode, but that would add a lot of complexity for not
+#   much benefit...

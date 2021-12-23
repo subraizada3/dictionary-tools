@@ -1,0 +1,57 @@
+#!/bin/sh
+
+# Copyright 2020 Subramaniyam Raizada
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License version 3, as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
+
+output=$(echo "$1" | aspell -a | sed 1d | sed '$d') # sed removes 1st & last line
+
+if [ "$output" = '*' ]; then
+	exit;
+else
+	echo "$output" | sed 's/..//'; # sed removes first two characters
+fi
+
+
+
+# Output format of aspell (and hunspell) in various cases:
+
+# Correctly spelled word
+# echo hello | aspell -a
+# @(#) International Ispell Version 3.1.20 (but really Aspell 0.60.8)
+# *
+# [empty line]
+
+# Incorrectly spelled word
+# echo recieve | apell -a
+# @(#) International Ispell Version 3.1.20 (but really Aspell 0.60.8)
+# & recieve 15 0: receive, receiver, relieve, Recife, received, receives, revive, reeve, reserve, deceive, reliever, recede, recipe, recite, relive
+# [empty line]
+
+# Nonexistent word
+# echo ajfklsajflksdajlfkjaslfa | apell -a
+# @(#) International Ispell Version 3.1.20 (but really Aspell 0.60.8)
+# # ajfklsajflksdajlfkjaslfa 0
+# [empty line]
+
+
+
+# Processing steps:
+# Always remove the first version line and the last empty line from output
+# Then, if the remaining line is a '*', the input was correct, so exit without
+#   printing anything
+# However, if the remaining line was not '*', aspell suggested corrections.
+# In that case, remove the first two characters ('& ' or '# ' depending on
+#   whether corrections were suggested) and print that.
